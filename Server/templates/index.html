@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gomoku Game</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gomokuCanvas" width="750" height="750" onclick="onCanvasClick(event)"></canvas>
+    <script>
+        var canvas = document.getElementById('gomokuCanvas');
+        var context = canvas.getContext('2d');
+        var cellSize = 50;
+        var xImage = new Image();
+        var oImage = new Image();
+        var imagesLoaded = 0;
+
+        // Sostituisci questi percorsi con i percorsi corretti delle tue immagini
+        var xImagePath = "{{ url_for('static', filename='ximage.png') }}";
+        var oImagePath = "{{ url_for('static', filename='oimage.png') }}";
+
+        xImage.src = xImagePath;
+        oImage.src = oImagePath;
+
+        xImage.onload = oImage.onload = function () {
+            imagesLoaded++;
+            if (imagesLoaded === 2) { // Assicurati che entrambe le immagini siano caricate prima di disegnare la griglia
+                console.log("Immagini caricate correttamente.");
+                drawGrid();
+            }
+        };
+
+        xImage.onerror = oImage.onerror = function () {
+            console.error("Errore nel caricamento dell'immagine.");
+        };
+
+        function drawGrid() {
+            context.clearRect(0, 0, canvas.width, canvas.height); // Pulisce il canvas prima di disegnare
+            for (var i = 0; i <= 15; i++) {
+                context.moveTo(i * cellSize, 0);
+                context.lineTo(i * cellSize, canvas.height);
+                context.stroke();
+                context.moveTo(0, i * cellSize);
+                context.lineTo(canvas.width, i * cellSize);
+                context.stroke();
+            }
+        }
+
+        function drawMove(row, col, player) {
+            var padding = 1; // Spazio in pixel per evitare la sovrapposizione con la griglia
+            var imageSize = cellSize - (padding * 2); // Dimensione dell'immagine leggermente più piccola della cella
+            var x = col * cellSize + padding;
+            var y = row * cellSize + padding;
+
+            if (player === 'X') {
+                context.drawImage(xImage, x, y, imageSize, imageSize);
+            } else {
+                context.drawImage(oImage, x, y, imageSize, imageSize);
+            }
+        }
+
+
+        function onCanvasClick(event) {
+            var rect = canvas.getBoundingClientRect();
+            var x = event.clientX - rect.left;
+            var y = event.clientY - rect.top;
+            var row = Math.floor(y / cellSize);
+            var col = Math.floor(x / cellSize);
+            playerMove(row, col);
+        }
+
+        function playerMove(row, col) {
+            fetch('/make_move', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    row: row,
+                    col: col
+                }),
+            }).then(response => response.json()).then(data => {
+                if (data.error) {
+                    alert("Mossa non valida, scegli un'altra posizione.");
+                } else {
+                    if (data.row !== null && data.col !== null) {
+                        drawMove(row, col, 'X'); // Disegna mossa giocatore
+                    }
+                    if (data.ai_row !== null && data.ai_col !== null) {
+                        drawMove(data.ai_row, data.ai_col, 'O'); // Disegna mossa AI
+                    }
+                    if (data.winner) {
+                        alert("The winner is the " + data.winner);
+                    }
+                }
+            }).catch((error) => {
+                console.error('Error:', error);
+            });
+        }
+
+        drawGrid();
+    </script>
+</body>
+</html>

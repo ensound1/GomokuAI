@@ -12,158 +12,15 @@ from tqdm import tqdm
 import gc
 import wandb
 import os
-
-# Configurazione TensorFlow per evitare l'allocazione completa della memoria GPU
-gpus = tf.config.experimental.list_physical_devices('GPU')
-if gpus:
-    try:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-    except RuntimeError as e:
-        print(e)
+from game_classes import GomokuBoard
 
 print("ACTIVE GPUS: ", tf.config.list_physical_devices("GPU"))
-
-
-class InfiniteTicTacToe:
-    def __init__(self, size=15):
-        self.size = size  # Dimensione della griglia di gioco
-        self.board = [[" " for _ in range(self.size)] for _ in range(self.size)]  # Inizializzazione della griglia
-        self.board_values = [[0 for _ in range(self.size)] for _ in range(self.size)]
-        self.current_player_value = 1
-        self.current_player = "X"  # Il giocatore corrente (X o O)
-        self.last_row, self.last_col = None, None
-        self.last_last_row, self.last_last_col = None, None
-
-    def print_board(self):
-        for row in self.board:
-            print("|".join(row))
-            print("-" * (self.size * 2 - 1))
-
-    def make_move(self, row, col):
-        if self.is_valid_move(row, col):
-            self.board[row][col] = self.current_player
-            winner = self.check_winner()
-            self.current_player = "O" if self.current_player == "X" else "X"
-            self.board_values[row][col] = self.current_player_value
-            self.current_player_value = -1 if self.current_player_value == 1 else 1
-            self.last_last_row, self.last_last_col = self.last_row, self.last_col
-            self.last_row, self.last_col = row, col
-            return True, winner
-        return False, None
-
-
-    def is_valid_move(self, row, col):
-        return 0 <= row < self.size and 0 <= col < self.size and self.board[row][col] == " "
-
-    def check_winner(self):
-        if self.last_row == None:
-            return None
-        player = self.board[self.last_row][self.last_col]
-        if player == " ":
-            return None
-
-        # Controlla la riga, la colonna e le diagonali dell'ultima mossa
-        if (self.check_line_winner(self.last_row, self.last_col, 1, 0) or  # Orizzontale
-            self.check_line_winner(self.last_row, self.last_col, 0, 1) or  # Verticale
-            self.check_line_winner(self.last_row, self.last_col, 1, 1) or  # Diagonale principale
-            self.check_line_winner(self.last_row, self.last_col, 1, -1)):  # Diagonale secondaria
-            return player
-
-        return None
-        
-    def check_line_winner(self, start_row, start_col, delta_row, delta_col):
-        player = self.board[start_row][start_col]
-        count = 1  # Inizia con 1 perché include l'ultima mossa
-
-        # Controlla in una direzione
-        for i in range(1, 5):
-            new_row = start_row + i * delta_row
-            new_col = start_col + i * delta_col
-            if 0 <= new_row < self.size and 0 <= new_col < self.size and self.board[new_row][new_col] == player:
-                count += 1
-            else:
-                break
-
-        # Controlla nella direzione opposta
-        for i in range(1, 5):
-            new_row = start_row - i * delta_row
-            new_col = start_col - i * delta_col
-            if 0 <= new_row < self.size and 0 <= new_col < self.size and self.board[new_row][new_col] == player:
-                count += 1
-            else:
-                break
-        return count >= 5  # Restituisce True se una riga di 5 è stata completata, altrimenti False
-                
-    def complete_row_of_5(self):
-        if self.last_last_row is None:
-            return None
-
-        # Limita il controllo alle celle che potrebbero formare una riga di 5
-        for delta_row in range(-4, 5):
-            for delta_col in range(-4, 5):
-                row = self.last_last_row + delta_row
-                col = self.last_last_col + delta_col
-    
-                if 0 <= row < self.size and 0 <= col < self.size and self.board[row][col] == " ":
-                    # Simula una mossa e controlla se forma una riga di 5
-                    self.board[row][col] = self.current_player
-                    last_row_ = self.last_row 
-                    last_col_ = self.last_col
-                    self.last_row = row
-                    self.last_col = col
-                    if self.check_winner() == self.current_player:
-                        self.board[row][col] = " "  # Ripristina la griglia
-                        self.last_row = last_row_
-                        self.last_col = last_col_
-                        return row, col  # Restituisci le coordinate della casella da riempire
-                    self.board[row][col] = " "  # Ripristina la griglia
-                    self.last_row = last_row_
-                    self.last_col = last_col_
-    
-        return None
-       
-    def get_possible_moves(self):
-        possible_moves = []
-        for row in range(self.size):
-            for col in range(self.size):
-                if self.board[row][col] == " ":
-                    possible_moves.append((row, col))
-        return possible_moves
-
-
-    def is_game_over(self):
-        if self.check_winner() is not None:
-            return True
-        for row in self.board:
-            if " " in row:
-                return False
-        return True  # Draw
-          
-    def get_winner(self):
-        winner = self.check_winner()
-        if winner is not None:
-            return winner
-        if all(all(cell != " " for cell in row) for row in self.board):
-            return "Draw"
-        return None
-
-    def get_move_from_state(self, old_state, new_state):
-        for row in range(self.size):
-            for col in range(self.size):
-                if old_state[row][col] != new_state[row][col]:
-                    return row, col
-        return None
-
-
-# In[13]:
-
 
 def softmax(x, temperature=0.005):
     e_x = np.exp((x - np.max(x)) / temperature)
     return e_x / e_x.sum(axis=0)
 
-def choose_move_by_probability(predictions, temperature = 0.005):
+def choose_move_by_probability(predictions, temperature = 0.05):
     """ Sceglie una mossa basata sulla probabilità calcolata dalle predizioni. """
     # Trasforma le stime per favorire i valori più bassi
     transformed_predictions = - predictions
@@ -173,99 +30,14 @@ def choose_move_by_probability(predictions, temperature = 0.005):
     move_index = np.random.choice(len(predictions), p=probabilities)
     return move_index
 
-
-# In[14]:
-
-
-def generate_by_mixed_strategy(n_games, model, game_size, temperature = 1, fraction = 0.1, pad = 3):
-    games_data = [[[], None] for _ in range(n_games)]
-    games = [InfiniteTicTacToe(game_size) for _ in range(n_games)]
-    unfinished_games = set(range(n_games))
-
-
-    def prepare_input(batch_moves):
-        input_shape = model.input_shape  # Assumendo che input_shape sia accessibile
-        if input_shape == (None, game_size, game_size, 2):
-            return double_grids(batch_moves)
-        return batch_moves
-
-    with tqdm(total=n_games) as pbar:
-        iteration = 0
-        while unfinished_games:
-            batch_moves = []
-            batch_positions = []
-            game_indices = []
-    
-            # Itera su una copia del set unfinished_games
-            for game_index in list(unfinished_games):
-                game = games[game_index]
-
-                winner = game.check_winner()
-                if winner in ["X", "O"]:
-                    games_data[game_index][1] = winner
-                    games_data[game_index][0].append((np.copy(game.board), game.current_player))
-                    unfinished_games.remove(game_index)
-                    continue
-                else:
-                    if iteration<pad or fraction >= np.random.random():
-                        row, col = random.randint(0, game.size - 1), random.randint(0, game.size - 1)
-                        while not game.is_valid_move(row, col):
-                            row, col = random.randint(0, game.size - 1), random.randint(0, game.size - 1)
-                        game.make_move(row, col)
-                        games_data[game_index][0].append((np.copy(game.board), game.current_player))  # Salva lo stato della griglia e il giocatore corrente
-                        continue
-                        
-                    for row in range(game.size):
-                        for col in range(game.size):
-                            if game.board[row][col] == " ":
-                                temp_board = np.copy(game.board_values)
-                                if game.current_player == "X":
-                                    temp_board = -temp_board
-                                temp_board[row][col] = -1
-                                temp_board = temp_board.reshape(1, game.size, game.size, 1)
-                                batch_moves.append(temp_board)
-                                batch_positions.append((row, col))
-                                game_indices.append(game_index)
-            if batch_moves:
-                prepared_input = prepare_input(np.concatenate(batch_moves, axis=0))
-                predictions = model.predict(prepared_input, verbose=0)
-
-                current_game_index = game_indices[0]
-                index_of_first_prediction_for_current_game = 0
-                for i, pred in enumerate(predictions):
-                    if current_game_index != game_indices[i]:
-                        best_move_idx = choose_move_by_probability(predictions[index_of_first_prediction_for_current_game:i].flatten(), temperature)
-                        best_row, best_col = batch_positions[index_of_first_prediction_for_current_game+best_move_idx]
-                        if not games[current_game_index].make_move(best_row, best_col):
-                            print("Mossa intermedia non valida!")
-                        games_data[current_game_index][0].append((np.copy(games[current_game_index].board), games[current_game_index].current_player))
-                        index_of_first_prediction_for_current_game = i
-                        current_game_index = game_indices[i]
-                #Devo chiudere l'ultima partita!
-                best_move_idx = choose_move_by_probability(predictions[index_of_first_prediction_for_current_game:].flatten(), temperature)
-                best_row, best_col = batch_positions[index_of_first_prediction_for_current_game+best_move_idx]
-                if not games[current_game_index].make_move(best_row, best_col):
-                    print("Mossa intermedia non valida!")
-                games_data[current_game_index][0].append((np.copy(games[current_game_index].board), games[current_game_index].current_player))
-            pbar.n = n_games - len(unfinished_games)
-            pbar.refresh()
-            iteration += 1
-    return games_data
-
-
-# In[15]:
-
-
-def flip(board):
-    flipped_board = [[cell if cell == " " else ("O" if cell == "X" else "X") for cell in row] for row in board]
-    return flipped_board
-# Supponiamo che tu abbia già il tuo dataset di giochi come games_data
-# games_data è una lista di tuple, dove ogni tupla contiene (game_data, winner)
-
-def monte_carlo_value_estimation(games_data, gamma=1):
+def monte_carlo_value_estimation(games_data, gamma=0.9):
     # Inizializza il valore di ogni stato della griglia come una lista vuota
     state_values = {}
     double_counted = 0
+    
+    def flip(board):
+        flipped_board = [[cell if cell == " " else ("O" if cell == "X" else "X") for cell in row] for row in board]
+        return flipped_board
 
     for game_data, winner in games_data:
         i = 0
@@ -301,116 +73,62 @@ def monte_carlo_value_estimation(games_data, gamma=1):
         state_values[state] = sum(values) / len(values)
         double_counted +=len(values)-1
         tot += len(values)
-    print("Doppioni: ", double_counted, " ", np.round(double_counted/tot*100), "%")
-    return state_values
-
-
-# Calcola i valori utilizzando l'approccio Monte Carlo
-#state_values = monte_carlo_value_estimation(games_data)
-def convert_board_to_matrix(board):
-    matrix = []
-    for row in board:
-        matrix_row = []
-        for cell in row:
-            if cell == "X":
-                matrix_row.append(1)
-            elif cell == "O":
-                matrix_row.append(-1)
-            else:
-                matrix_row.append(0)
-        matrix.append(matrix_row)
-    return matrix
-
-def prepare_data(state_values):
+    print("Double counted: ", double_counted, " ", np.round(double_counted/tot*100), "%")
+    
     X = []
     y = []
-
     for state, value in state_values.items():
-        matrix = convert_board_to_matrix(state)
-        X.append(matrix)
+        X.append(state)
         y.append(value)
-
-    # Convertendo le liste in array numpy
-    X = np.array(X)
-    y = np.array(y)
-
-    # Reshaping X per aggiungere un canale extra (necessario per l'input nel modello CNN)
-    X = X.reshape(X.shape[0], X.shape[1], X.shape[2], 1)
-
     return X, y
 
-
-# In[16]:
-
-
-wandb.init(project="InfiniteTicTacToe", entity="ensound")
-
-
-# In[17]:
-
-
-def double_grids(grids):
-    # Creazione di un nuovo array numpy con la dimensione desiderata
-    new_grids = np.zeros((grids.shape[0], grids.shape[1], grids.shape[2], 2))
-
-    # Impostare 1 nel primo canale dove c'erano 1
-    new_grids[:,:,:,0] = (grids == 1).squeeze()
-
-    # Impostare 1 nel secondo canale dove c'erano -1
-    new_grids[:,:,:,1] = (grids == -1).squeeze()
-
-    return new_grids
-
-
-# In[18]:
-
-
-def fight(modelA, modelB, n_games = 1, temperature = 0.01, verbose = 1):
+def fight(modelA, modelB, n_games = 500, temperature = 0.05, random_prob = 0, random_init=1, verbose = 1):
     games_data = [[[], None] for _ in range(n_games)]
-    games = [InfiniteTicTacToe(game_size) for _ in range(n_games)]
+    games = [GomokuBoard() for _ in range(n_games)]
     unfinished_games = set(range(n_games))
 
-    def prepare_input(model, batch_moves):
-        input_shape = model.input_shape  # Assumendo che input_shape sia accessibile
-        if input_shape == (None, 15, 15, 2):
-            return double_grids(batch_moves)
-        return batch_moves
-
     pbar = tqdm(total=n_games) if verbose == 1 else None
+    iteration = 0
     while unfinished_games:
-        
         batch_moves = []
         batch_positions = []
         game_indices = []
 
-        # Itera su una copia del set unfinished_games
+        #Iterate over a copy of unfinished_games (indices)
         for game_index in list(unfinished_games):
             game = games[game_index]
 
-            if game.check_winner():
-                games_data[game_index][1] = "X" if  game.current_player == "O" else "O"
+            winner =  game.is_last_winnning()
+            if winner:
+                games_data[game_index][1] = winner
+                games_data[game_index][0].append((np.copy(game.board), game.current_player))
                 unfinished_games.remove(game_index)
                 continue
-                
+            
+            if iteration<random_init or random_prob >= np.random.random():
+                 row, col = random.randint(0, game.size), random.randint(0, game.size)
+                 while not game.is_valid_move(row, col):
+                      row, col = random.randint(0, game.size), random.randint(0, game.size)
+                 game.make_move(row, col)
+                 games_data[game_index][0].append((np.copy(game.board), game.current_player))  # Salva lo stato della griglia e il giocatore corrente
+                 continue
+            
+            #if random move 
             for row in range(game.size):
                 for col in range(game.size):
                     if game.board[row][col] == " ":
-                        temp_board = convert_board_to_matrix(game.board)
-                        temp_board = np.array(temp_board)
-                        if game.current_player == "X":
-                            temp_board = -temp_board
-                        temp_board[row][col] = -1
-                        temp_board = temp_board.reshape(1, game.size, game.size, 1)
+                        temp_board = np.array(game.board)
+                        temp_board[row][col] = "X" if game.player_to_move == "X" else "O"
                         batch_moves.append(temp_board)
                         batch_positions.append((row, col))
                         game_indices.append(game_index)
 
         if batch_moves:
             if game.current_player == "X":
-                prepared_input = prepare_input(modelA, np.concatenate(batch_moves, axis=0))
+                prepared_input = GomokuBoard.prepare_input(modelA, batch_moves, "O")
                 predictions = modelA.predict(prepared_input, verbose=0)
             else:
-                prepared_input = prepare_input(modelB, np.concatenate(batch_moves, axis=0))
+                prepared_input = GomokuBoard.prepare_input(modelB, batch_moves, "X")
                 predictions = modelB.predict(prepared_input, verbose=0)
                 
             preds = []
@@ -425,7 +143,7 @@ def fight(modelA, modelB, n_games = 1, temperature = 0.01, verbose = 1):
                     best_move_idx = choose_move_by_probability(np.array(preds), temperature)
                     best_row, best_col = pos[best_move_idx]
                     if not games[current_game_index].make_move(best_row, best_col):
-                        print("Mossa intermedia non valida!")
+                        print("Invalid intermidiate move!")
                     games_data[current_game_index][0].append((np.copy(games[current_game_index].board), games[current_game_index].current_player))
                     preds = [pred]
                     current_game_index = game_indices[i]
@@ -433,20 +151,20 @@ def fight(modelA, modelB, n_games = 1, temperature = 0.01, verbose = 1):
             best_move_idx = choose_move_by_probability(np.array(preds), temperature)
             best_row, best_col = pos[best_move_idx]
             if not games[current_game_index].make_move(best_row, best_col):
-                print("Mossa intermedia non valida!")
+                print("Invalid intermidiate move!")
             games_data[current_game_index][0].append((np.copy(games[current_game_index].board), games[current_game_index].current_player))
         if pbar is not None:
             pbar.n = n_games - len(unfinished_games)
             pbar.refresh()
-        del batch_moves
+        iteration += 1
+        del batch_moves, batch_positions
+        
+
     if pbar is not None:
         pbar.close()
-
+        
+    del games
     return games_data
-
-
-# In[19]:
-
 
 early_stopping = EarlyStopping(
     monitor='val_loss',  # or 'val_accuracy' if you're focusing on accuracy
@@ -454,7 +172,7 @@ early_stopping = EarlyStopping(
     patience=2,         # number of epochs with no improvement after which training will be stopped
     restore_best_weights=True
 )
-#online learning, cioè ne gioco 100 e poi alleno e così via... vediamo che succede. per testare lo faccio combattere contro tutti i modelli precedenti
+
 save_file= "DISPREZZO"
 game_size = 15
 steps = 100
@@ -484,38 +202,32 @@ else:
     print("Nessun file di modello trovato nella directory corrente.")
 
 import psutil
+def print_mem():
+    memory_info = psutil.virtual_memory()
+    available_memory = memory_info.available / (1024 * 1024)  # Converti in MB
+    print(f"Memoria disponibile: {available_memory:.2f} MB")
+    
 def main():
-    games_data = None
+    wandb.init(project="InfiniteTicTacToe", entity="ensound")
+    games_data = []
     for step in range(max_version+1,max_version+steps+1):
-        memory_info = psutil.virtual_memory()
-        available_memory = memory_info.available / (1024 * 1024)  # Converti in MB
-        print(f"Memoria residua disponibile: {available_memory:.2f} MB")
-        wandb_metrics = {}  # Dictionary to collect metrics
         print("Step", step)
+        print_mem()
+        wandb_metrics = {}  # Dictionary to collect metrics
         #Creo i dati
-        if games_data is None:
-            games_data = generate_by_mixed_strategy(n_games, model, game_size, temperature = 0.01, fraction = 0.05, pad = 1)
-            #games_data += generate_by_mixed_strategy(n_games, model, game_size, temperature = 0.01, fraction = 0.05, pad = 10)
-        else:
-            games_data += generate_by_mixed_strategy(n_games, model, game_size, temperature = 0.01, fraction = 0.05, pad = 1)
+        games_data += fight(model, model, n_games, temperature = 0.05, random_prob = 0.05, random_init = 1)
         mean_length = np.average([len(games_data[i][0]) for i in range(n_games)])
         print("Lunghezza media di una partita: ", mean_length)
-        #gamma = (0.05)**(1/mean_length)
         gamma = 0.9
         print("Gamma: ", np.round(gamma*100), "%")
         print("Vittorie di X: ", np.average([1  if games_data[i][1] == "X" else 0 for i in range(n_games)]))
-        state_values = monte_carlo_value_estimation(games_data, gamma)
+        X, y = monte_carlo_value_estimation(games_data, gamma)
         del games_data
         gc.collect()
-        print("Costruisco dataset e lo salvo")
-        X, y = prepare_data(state_values)
         joblib.dump(X, "dis/X"+str(step))
         joblib.dump(y, "dis/y"+str(step)) 
-        print("Preparo la matrice doppia")
-        X = double_grids(X)
-        #print("Aumento il dataset "+ str(len(X)) +"-->", end = " ")
-        #X, y = augment(X, y)
-        print("Numero di training examples: ", len(X))
+        print("Number of training examples: ", len(X))
+        X = GomokuBoard.prepare_input(model, X, )
         X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.1, random_state=42, shuffle = False)
         history = model.fit(X_train, y_train, epochs=100, batch_size=2048, validation_data=(X_val, y_val), callbacks=[early_stopping])
         wandb_metrics['loss'] = history.history['loss'][-1]
@@ -557,10 +269,7 @@ def main():
 
 if __name__ == "__main__":
     #cProfile.run('main()', sort='cumtime')
-    try:
-        main()
-    except e:
-        print(e)
+    main()
 
 
 
