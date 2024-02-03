@@ -1,8 +1,11 @@
 {
   "ExpandedNodes": [
     "",
-    "\\Server"
+    "\\Server",
+    "\\Server\\static",
+    "\\Server\\templates",
+    "\\Training"
   ],
-  "SelectedNode": "\\Server\\game_classes.py",
+  "SelectedNode": "\\Training\\TRAINER.py",
   "PreviewInSolutionExplorer": false
 }

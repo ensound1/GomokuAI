@@ -26,7 +26,7 @@ class GomokuBoard:
             self.player_to_move = "O" if player == "X" else "X"
             self.history_of_moves.append((row,col))
             return True
-        print("MOSSA NON VALIDA")
+        print("Invalid move at game_classes GomokuBoard.make_move")
         return False
 
     def is_valid_move(self, row, col):
@@ -84,6 +84,18 @@ class GomokuBoard:
                     possible_positions.append(temp_board)
         return possible_positions
     
+    def get_possible_moves_and_positions(self):
+        possible_positions = []
+        possible_moves = []
+        for row in range(self.board_size):
+            for col in range(self.board_size):
+                if self.board[row][col] == " ":
+                    temp_board = np.copy(np.array(self.board))
+                    temp_board[row, col] = self.player_to_move
+                    possible_positions.append(temp_board)
+                    possible_moves.append((row,col))
+        return possible_moves, possible_positions
+    
     @staticmethod
     def get_player_to_move(board):
         tot_moves = sum([sum([1 for pos in row if pos != " "]) for row in board])
@@ -91,7 +103,6 @@ class GomokuBoard:
 
     @staticmethod
     def board_to_single_channel_values(boards):
-        # Calcola la dimensione dell'output basandoti sul numero di boards
         board_values = np.zeros((len(boards), GomokuBoard.board_size, GomokuBoard.board_size, 1))
 
         for b_index, board in enumerate(boards):
@@ -107,9 +118,7 @@ class GomokuBoard:
 
     @staticmethod
     def board_to_double_channel_values(boards):
-        # Calcola la dimensione dell'output basandoti sul numero di boards
-        boards_count = len(boards)
-        board_values = np.zeros((boards_count, GomokuBoard.board_size, GomokuBoard.board_size, 2))
+        board_values = np.zeros((len(boards), GomokuBoard.board_size, GomokuBoard.board_size, 2))
 
         for b_index, board in enumerate(boards):
             for row in range(GomokuBoard.board_size):
@@ -143,7 +152,7 @@ class Player:
         return True
     
 class AIPlayer:
-    def __init__(self,gomoku_board, model = None, temperature = 0.05, difficulty = 0, symbol = "O"):
+    def __init__(self,gomoku_board, model = None, temperature = 0.01, difficulty = 0, symbol = "O"):
         self.gomoku_board  = gomoku_board
         self.symbol = symbol
         self.model = model
@@ -151,11 +160,8 @@ class AIPlayer:
         self.difficulty = difficulty
 
     def choose_move_by_value(self, moves, values, temperature = 0.05):
-        # Calcola la distribuzione di probabilità
         probabilities = self.softmax(values, temperature)
-        # Esegui sampling basato sulla distribuzione di probabilità
         move_index = np.random.choice(len(moves), p=probabilities)
-        # Restituisci la mossa corrispondente a quell'indice
         return moves[move_index]
         
     def make_move(self, row, col):
@@ -175,9 +181,9 @@ class AIPlayer:
             model = self.model
         if difficulty is None:
             difficulty = self.difficulty
-        moves = self.gomoku_board.get_possible_moves()
-        input_ = GomokuBoard.prepare_input(model, self.gomoku_board.get_possible_positions())
-        position_values = -model.predict(input_).flatten() #il modello prende in input la posizione del giocatore che deve muovere, ciè l'altro se simulo la mia mossa
+        moves, positions = self.gomoku_board.get_possible_moves_and_positions()
+        input_ = GomokuBoard.prepare_input(model, positions)
+        position_values = -model.predict(input_).flatten()
         move = self.choose_move_by_value(moves, position_values, temperature)
         if not self.gomoku_board.make_move(*move, self.symbol):
             print("Invalid move by AI")

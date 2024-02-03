@@ -5,7 +5,7 @@ from tensorflow.keras.models import load_model
 app = Flask(__name__)
 
 # Carica il modello di TensorFlow
-model = load_model("Models/DISPREZZOv100")
+model = load_model("Server\\Models\\DISPREZZOv100")
 
 # Inizializza il gioco Gomoku
 board = GomokuBoard()

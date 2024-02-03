@@ -73,6 +73,7 @@
         }
 
         function playerMove(row, col) {
+            drawMove(row, col, 'X'); // Disegna mossa giocatore
             fetch('/make_move', {
                 method: 'POST',
                 headers: {
@@ -86,9 +87,6 @@
                 if (data.error) {
                     alert("Mossa non valida, scegli un'altra posizione.");
                 } else {
-                    if (data.row !== null && data.col !== null) {
-                        drawMove(row, col, 'X'); // Disegna mossa giocatore
-                    }
                     if (data.ai_row !== null && data.ai_col !== null) {
                         drawMove(data.ai_row, data.ai_col, 'O'); // Disegna mossa AI
                     }
