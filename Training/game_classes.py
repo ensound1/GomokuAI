@@ -5,7 +5,7 @@ class GomokuBoard:
         self.board_size = board_size  if board is None else len(board[0])
         self.board = [[" " for _ in range(self.board_size)] for _ in range(self.board_size)] if board is None else board
         self.player_to_move = player_to_move
-        self.history_of_moves = []  #non so come recuperarle dalla board
+        self.history_of_moves = []  #it's empty even if board is not empty, might be a problem
 
     def print_board(self):
         for row in self.board:
