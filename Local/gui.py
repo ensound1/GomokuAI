@@ -53,7 +53,7 @@ def on_canvas_click(event):
 def reset_game():
     global winner_announced, board, text_ids
     winner_announced = False
-    board = GomokuBoard()
+    board.reset()
     game_canvas.delete("all")
     text_ids = {}
     draw_grid(game_canvas, game_size, cell_size)

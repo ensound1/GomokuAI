@@ -97,6 +97,12 @@ class GomokuBoard:
                     possible_moves.append((row,col))
         return possible_moves, possible_positions
     
+    def reset(self):
+        self.board = [[" " for _ in range(GomokuBoard.board_size)] for _ in range(GomokuBoard.board_size)]
+        self.player_to_move = "X"
+        self.history_of_moves = []  #non so come recuperarle dalla board
+        self.winner = None
+    
     @staticmethod
     def get_player_to_move(board):
         tot_moves = sum([sum([1 for pos in row if pos != " "]) for row in board])
