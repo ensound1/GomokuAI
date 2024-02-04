@@ -1,4 +1,3 @@
-import cProfile
 import numpy as np
 
 class GomokuBoard:
@@ -27,7 +26,6 @@ class GomokuBoard:
             self.player_to_move = "O" if player == "X" else "X"
             self.history_of_moves.append((row,col))
             return True
-        print("Invalid move at game_classes GomokuBoard.make_move")
         return False
 
     def is_valid_move(self, row, col):
@@ -102,6 +100,11 @@ class GomokuBoard:
         self.player_to_move = "X"
         self.history_of_moves = []  #non so come recuperarle dalla board
         self.winner = None
+    
+    def value_of_position(self, model, board = None):
+        if board is None:
+            board = self.board
+        return model.predict(GomokuBoard.prepare_input(model, [board]))
     
     @staticmethod
     def get_player_to_move(board):
